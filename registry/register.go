@@ -9,10 +9,11 @@ package registry
 import (
 	"context"
 	"fmt"
-	clientv3 "go.etcd.io/etcd/client/v3"
-	"go.etcd.io/etcd/client/v3/naming/endpoints"
 	"log"
 	"time"
+
+	clientv3 "go.etcd.io/etcd/client/v3"
+	"go.etcd.io/etcd/client/v3/naming/endpoints"
 )
 
 var (
@@ -23,7 +24,7 @@ var (
 )
 
 // etcdAdd 在租赁模式添加一对kv至etcd
-func etcdAdd(c *clientv3.Client, lid clientv3.LeaseID, service string, addr string) error {
+func EtcdAdd(c *clientv3.Client, lid clientv3.LeaseID, service string, addr string) error {
 	em, err := endpoints.NewManager(c, service)
 	if err != nil {
 		return err
@@ -48,7 +49,7 @@ func Register(service string, addr string, stop chan error) error {
 	}
 	leaseId := resp.ID
 	// 注册服务
-	err = etcdAdd(cli, leaseId, service, addr)
+	err = EtcdAdd(cli, leaseId, service, addr)
 	if err != nil {
 		return fmt.Errorf("add etcd record failed: %v", err)
 	}
@@ -58,7 +59,7 @@ func Register(service string, addr string, stop chan error) error {
 		return fmt.Errorf("set keepalive failed: %v", err)
 	}
 
-	log.Printf("[%s] register service ok\n", addr)
+	fmt.Printf("[%s] register service ok\n", addr)
 	for {
 		select {
 		case err := <-stop:
@@ -67,12 +68,12 @@ func Register(service string, addr string, stop chan error) error {
 			}
 			return err
 		case <-cli.Ctx().Done():
-			log.Println("service closed")
+			fmt.Println("service closed")
 			return nil
 		case _, ok := <-ch:
 			// 监听租约
 			if !ok {
-				log.Println("keep alive channel closed")
+				fmt.Println("keep alive channel closed")
 				_, err := cli.Revoke(context.Background(), leaseId)
 				return err
 			}

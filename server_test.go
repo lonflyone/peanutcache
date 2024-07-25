@@ -38,7 +38,7 @@ func createTestSvr() (*Group, *server) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	svr.SetPeers(addr)
+	svr.SetPeers()
 	g.RegisterSvr(svr)
 	return g, svr
 }

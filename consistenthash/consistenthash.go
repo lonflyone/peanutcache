@@ -28,12 +28,25 @@ type Consistency struct {
 func (c *Consistency) Register(peersName ...string) {
 	for _, peerName := range peersName {
 		for i := 0; i < c.replicas; i++ {
-			hashValue := int(c.hash([]byte(strconv.Itoa(i)+peerName)))
+			hashValue := int(c.hash([]byte(strconv.Itoa(i) + peerName)))
 			c.ring = append(c.ring, hashValue)
 			c.hashmap[hashValue] = peerName
 		}
 	}
 	sort.Ints(c.ring)
+}
+
+func (c *Consistency) Deregister(peersName ...string) {
+	for _, peerName := range peersName {
+		for i := 0; i < c.replicas; i++ {
+			hashValue := int(c.hash([]byte(strconv.Itoa(i) + peerName)))
+			for j, r := range c.ring {
+				if r == hashValue {
+					c.ring = append(c.ring[:j], c.ring[j+1:]...)
+				}
+			}
+		}
+	}
 }
 
 // GetPeer 计算key应缓存到的peer

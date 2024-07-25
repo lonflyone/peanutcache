@@ -7,14 +7,15 @@ package peanutcache
 import (
 	"context"
 	"fmt"
-	"github.com/peanutzhen/peanutcache/consistenthash"
-	pb "github.com/peanutzhen/peanutcache/peanutcachepb"
-	"github.com/peanutzhen/peanutcache/registry"
 	"log"
 	"net"
 	"strings"
 	"sync"
 	"time"
+
+	"geecache/peanutcache/consistenthash"
+	pb "geecache/peanutcache/peanutcachepb"
+	"geecache/peanutcache/registry"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"google.golang.org/grpc"
@@ -63,8 +64,7 @@ func NewServer(addr string) (*server, error) {
 func (s *server) Get(ctx context.Context, in *pb.GetRequest) (*pb.GetResponse, error) {
 	group, key := in.GetGroup(), in.GetKey()
 	resp := &pb.GetResponse{}
-
-	log.Printf("[peanutcache_svr %s] Recv RPC Request - (%s)/(%s)", s.addr, group, key)
+	fmt.Printf("[peanutcache_svr %s] Recv RPC Request - (%s)/(%s)", s.addr, group, key)
 	if key == "" {
 		return resp, fmt.Errorf("key required")
 	}
@@ -110,7 +110,7 @@ func (s *server) Start() error {
 	// 注册服务至etcd
 	go func() {
 		// Register never return unless stop singnal received
-		err := registry.Register("peanutcache", s.addr, s.stopSignal)
+		err := registry.Register("peanutcache/"+s.addr, s.addr, s.stopSignal)
 		if err != nil {
 			log.Fatalf(err.Error())
 		}
@@ -124,7 +124,7 @@ func (s *server) Start() error {
 		log.Printf("[%s] Revoke service and close tcp socket ok.", s.addr)
 	}()
 
-	//log.Printf("[%s] register service ok\n", s.addr)
+	log.Printf("[%s] register service ok\n", s.addr)
 	s.mu.Unlock()
 
 	if err := grpcServer.Serve(lis); s.status && err != nil {
@@ -137,10 +137,14 @@ func (s *server) Start() error {
 // 这样Server就可以Pick他们了
 // 注意: 此操作是*覆写*操作！
 // 注意: peersIP必须满足 x.x.x.x:port的格式
-func (s *server) SetPeers(peersAddr ...string) {
+func (s *server) SetPeers() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
+	cli, _ := clientv3.New(defaultEtcdConfig)
+	// defer cli.Close()
+	// 获取所有远端主机IP
+	peersAddr := registry.GetPeers(cli)
+	peersAddr = append(peersAddr, s.addr)
 	s.consHash = consistenthash.New(defaultReplicas, nil)
 	s.consHash.Register(peersAddr...)
 	s.clients = make(map[string]*client)
@@ -151,6 +155,50 @@ func (s *server) SetPeers(peersAddr ...string) {
 		service := fmt.Sprintf("peanutcache/%s", peerAddr)
 		s.clients[peerAddr] = NewClient(service)
 	}
+	// 开一个协程一直循环 直到stopSignal收到信息才退出
+	go func() {
+		for {
+			select {
+			case <-s.stopSignal:
+				log.Println("stop set peers")
+				return
+			case <-cli.Ctx().Done():
+				fmt.Println("What happend")
+				return
+			default:
+				time.Sleep(2 * time.Second)
+				peersAddrTs := registry.GetPeers(cli)
+				peersAddrNs := make([]string, 0)
+
+				// 移除所有已下线的peer
+				for pAddr, _ := range s.clients {
+					if !Contains(peersAddrTs, pAddr) {
+						s.consHash.Deregister(pAddr)
+						delete(s.clients, pAddr)
+					} else {
+						peersAddrNs = append(peersAddrNs, pAddr)
+					}
+				}
+				//滚动更新
+				for _, peerAddr := range peersAddrTs {
+					if !Contains(peersAddrNs, peerAddr) {
+						s.consHash.Register(peerAddr)
+						service := fmt.Sprintf("peanutcache/%s", peerAddr)
+						s.clients[peerAddr] = NewClient(service)
+					}
+				}
+			}
+		}
+	}()
+
+}
+func Contains(list []string, str string) bool {
+	for _, s := range list {
+		if s == str {
+			return true
+		}
+	}
+	return false
 }
 
 // Pick 根据一致性哈希选举出key应存放在的cache
@@ -177,8 +225,8 @@ func (s *server) Stop() {
 		return
 	}
 	s.stopSignal <- nil // 发送停止keepalive信号
-	s.status = false // 设置server运行状态为stop
-	s.clients = nil // 清空一致性哈希信息 有助于垃圾回收
+	s.status = false    // 设置server运行状态为stop
+	s.clients = nil     // 清空一致性哈希信息 有助于垃圾回收
 	s.consHash = nil
 	s.mu.Unlock()
 }

@@ -7,7 +7,7 @@ package peanutcache
 // cache 模块负责提供对lru模块的并发控制
 
 import (
-	"github.com/peanutzhen/peanutcache/lru"
+	"geecache/peanutcache/lru"
 	"sync"
 )
 

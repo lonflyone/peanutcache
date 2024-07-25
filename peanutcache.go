@@ -6,7 +6,7 @@ package peanutcache
 
 import (
 	"fmt"
-	"github.com/peanutzhen/peanutcache/singlefilght"
+	"geecache/peanutcache/singlefilght"
 	"log"
 	"sync"
 )
@@ -100,6 +100,7 @@ func (g *Group) load(key string) (ByteView, error) {
 	view, err := g.flight.Fly(key, func() (interface{}, error) {
 		if g.server != nil {
 			if fetcher, ok := g.server.Pick(key); ok {
+				log.Printf("pick peer to get *%s*\n", key)
 				bytes, err := fetcher.Fetch(g.name, key)
 				if err == nil {
 					return ByteView{b: cloneBytes(bytes)}, nil

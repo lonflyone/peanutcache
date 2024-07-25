@@ -7,8 +7,8 @@ package peanutcache
 import (
 	"context"
 	"fmt"
-	pb "github.com/peanutzhen/peanutcache/peanutcachepb"
-	"github.com/peanutzhen/peanutcache/registry"
+	pb "geecache/peanutcache/peanutcachepb"
+	"geecache/peanutcache/registry"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
