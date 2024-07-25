@@ -129,17 +129,25 @@ func main() {
 Before `go run`, you should run `etcd` local directly(without any spcified parameter) and then execute `go run example.go`, you will get follows:
 
 ```console
-$ go run peanutcache_usage.go
-2021/08/01 18:09:17 peanutcache is running at localhost:9999
-2021/08/01 18:09:17 get Tom...
-2021/08/01 18:09:17 get Tom...
-2021/08/01 18:09:17 get Tom...
-2021/08/01 18:09:17 get Tom...
-2021/08/01 18:09:17 ooh! pick myself, I am localhost:9999
-2021/08/01 18:09:17 [Mysql] search key Tom
-630
-630
-630
-630
+$ go run main.go -port=8001 -api=1
+$ go run main.go -port=8002
+$ go run main.go -port=8003
+
+etcdctl get --prefix ""
+peanutcache/127.0.0.1:8001/127.0.0.1:8001
+{"Op":0,"Addr":"127.0.0.1:8001","Metadata":null}
+peanutcache/127.0.0.1:8002/127.0.0.1:8002
+{"Op":0,"Addr":"127.0.0.1:8002","Metadata":null}
+peanutcache/127.0.0.1:8003/127.0.0.1:8003
+{"Op":0,"Addr":"127.0.0.1:8003","Metadata":null}
+
+curl http://localhost:9999/api?key=Sam
+2024/07/25 16:16:38 peanutcache is running at 127.0.0.1:8002
+2024/07/25 16:16:38 [127.0.0.1:8002] register service ok
+[127.0.0.1:8002] register service ok
+[peanutcache_svr 127.0.0.1:8002] Recv RPC Request - (scores)/(Sam)2024/07/25 16:18:25 ooh! pick myself, I am 127.0.0.1:8002
+2024/07/25 16:18:25 [Mysql] search key Sam
+[peanutcache_svr 127.0.0.1:8002] Recv RPC Request - (scores)/(Sam)2024/07/25 16:19:57 cache hit
+
 ```
 
